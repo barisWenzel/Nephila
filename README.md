@@ -1,73 +1,119 @@
-"# Nephila" 
-content = """# Force Density Equilibrium — Grasshopper Plugin
-
-**A Grasshopper/Rhino plugin for form-finding of cable-net and shell structures using the Force Density Method (FDM).**
+Hier die aktualisierte README mit beiden Komponenten:
 
 ---
 
-## Description
+# Nephila — Force Density Grasshopper Plugin
 
-This plugin implements the iterative Force Density Method for structural form-finding in Rhino/Grasshopper. It supports:
-
-- Free and anchored nodes
-- Variable force densities per edge
-- External load vectors per node
-- Fixed edge length constraints (cables, struts)
-- Convergence detection with iteration + time display
+**A Grasshopper/Rhino plugin for structural form-finding using the Force Density Method (FDM).**
 
 ---
 
-## Installation
+## Components
 
-1. Build the project in Visual Studio (Release)
-2. Copy the resulting `.gha` file to:
+The plugin contains two components:
 
-%APPDATA%\Grasshopper\Libraries\
+| Component | Nickname | Category |
+|-----------|----------|----------|
+| Line Graph | `LGraph` | Nephila / Graph |
+| Force Density | `FD` | Nephila / Equilibrium |
 
-3. Unblock the file (Right-click → Properties → Unblock)
-4. Restart Rhino
+A typical workflow:
+
+```
+Lines → [Line Graph] → Points, Edges, PP, PL, LP
+                              ↓
+                      [Force Density] → Equilibrium Geometry
+```
 
 ---
 
-## Inputs
+## 1 · Line Graph `LGraph`
+
+Builds a graph topology from a list of lines. Deduplicates vertices and edges, and outputs adjacency trees for use in the solver.
+
+### Inputs
+
+| Name | Type | Description |
+|------|------|-------------|
+| `L` | `List<Line>` | Input lines |
+| `SE` | `bool` | Show edge index labels at midpoints |
+| `SV` | `bool` | Show vertex index labels at points |
+
+### Outputs
+
+| Name | Type | Description |
+|------|------|-------------|
+| `P` | `List<Point3d>` | Deduplicated vertex positions |
+| `E` | `List<Line>` | Deduplicated edges |
+| `PP` | `DataTree<int>` | Point–Point adjacency — path = vertex index, values = neighbour indices |
+| `PL` | `DataTree<int>` | Point–Edge adjacency — path = vertex index, values = edge indices |
+| `LP` | `DataTree<int>` | Edge–Point adjacency — path = edge index, values = [start, end] vertex indices |
+| `Labels` | `List<TextDot>` | Viewport labels for vertices and/or edges |
+
+### Notes
+
+- Vertex deduplication uses model tolerance (`RhinoDoc.ModelAbsoluteTolerance`)
+- Degenerate edges (start == end) are skipped
+- Duplicate edges are ignored regardless of direction
+
+---
+
+## 2 · Force Density Solver `FD`
+
+Iterative Force Density solver for equilibrium form-finding of cable-net and shell structures.
+
+### Inputs
 
 | Name | Type | Description |
 |------|------|-------------|
 | `anchorIndices` | `List<int>` | Indices of fixed anchor points |
-| `points` | `List<Point3d>` | Input point positions |
-| `edges` | `List<Line>` | Input edges |
-| `PP` | `DataTree<int>` | Point–Point adjacency |
-| `PL` | `DataTree<int>` | Point–Edge adjacency |
-| `P` | `List<Vector3d>` | External loads per node |
+| `points` | `List<Point3d>` | Input point positions (from `LGraph`) |
+| `edges` | `List<Line>` | Input edges (from `LGraph`) |
+| `PP` | `DataTree<int>` | Point–Point adjacency (from `LGraph`) |
+| `PL` | `DataTree<int>` | Point–Edge adjacency (from `LGraph`) |
+| `P` | `List<Vector3d>` | External load vectors per node |
 | `q` | `List<double>` | Force density per edge |
-| `fixedEdges` | `List<int>` | Edge indices with fixed length *(optional)* |
+| `fixedEdges` | `List<int>` | Edge indices with target length *(optional)* |
 | `targetLengths` | `List<double>` | Target lengths for fixed edges *(optional)* |
-| `maxIterations` | `int` | Maximum iterations (capped at 10,000) |
+| `maxIterations` | `int` | Maximum iterations (capped at 10 000) |
 
----
-
-## Outputs
+### Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
 | `A` | `List<Point3d>` | Resulting node positions |
 | `EdgeLines` | `List<Line>` | Resulting edge geometry |
-| `F_out` | `List<double>` | Force per edge `(q · L)` |
+| `F_out` | `List<double>` | Force per edge `q · L` |
 | `L_out` | `List<double>` | Length per edge |
+
+### Sign Convention
+
+| Value | Meaning |
+|-------|---------|
+| `q > 0` | Tension (cable) |
+| `q < 0` | Compression (strut/mast) |
+
+### Convergence
+
+The solver stops when:
+
+$$\max_i \| \mathbf{x}_i^{(k)} - \mathbf{x}_i^{(k-1)} \| < \varepsilon$$
+
+where $\varepsilon$ is the model tolerance. Iteration count and elapsed time are displayed on the component.
 
 ---
 
 ## Method
 
-The Force Density Method (Schek, 1974) solves the equilibrium of a network by expressing nodal equilibrium as:
+The Force Density Method (Schek, 1974) expresses nodal equilibrium as:
 
-$$\\sum_{j \\in N(i)} q_{ij} \\cdot (\\mathbf{x}_j - \\mathbf{x}_i) + \\mathbf{p}_i = 0$$
+$$\sum_{j \in N(i)} q_{ij} \cdot (\mathbf{x}_j - \mathbf{x}_i) + \mathbf{p}_i = 0$$
 
-where $q_{ij}$ is the force density (force/length) of edge $ij$ and $\\mathbf{p}_i$ is the external load at node $i$.
+Rearranged for the iterative update:
 
-The iterative solver repeats until:
+$$\mathbf{x}_i^{(k+1)} = \frac{\sum_{j \in N(i)} q_{ij} \cdot \mathbf{x}_j^{(k)} + \mathbf{p}_i}{\sum_{j \in N(i)} q_{ij}}$$
 
-$$\\max_i \\| \\mathbf{x}_i^{(k)} - \\mathbf{x}_i^{(k-1)} \\| < \\varepsilon$$
+Anchor nodes remain fixed throughout iteration.
 
 ---
 
@@ -79,47 +125,61 @@ $$\\max_i \\| \\mathbf{x}_i^{(k)} - \\mathbf{x}_i^{(k-1)} \\| < \\varepsilon$$
 
 ---
 
+## Installation
+
+1. Build in Visual Studio (Release)
+2. Copy `.gha` to:
+   ```
+   %APPDATA%\Grasshopper\Libraries\
+   ```
+3. Rechtsklick → Eigenschaften → **Unblock**
+4. Restart Rhino
+
+---
+
 ## License
 
+```
 MIT License
 
-Copyright (c) [2026] [Baris Wenzel]
+Copyright (c) [YEAR] [YOUR NAME]
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+```
 
 ---
 
 ## Citation
 
-If you use this software in academic work, please cite:
-
 ```bibtex
-@software{yourname_fdm_2025,
-  author    = {Baris Wenzel},
-  title     = {Force Density Equilibrium -- Grasshopper Plugin},
-  year      = {2026},
-  url       = {https://github.com/barisWenzel/Nephila},
-  note      = {Developed as part of doctoral dissertation, Universitaet Stuttgart}
+@software{[yourname]_nephila_[year],
+  author    = {[Baris, Wenzel]},
+  title     = {Nephila — Force Density Equilibrium Plugin for Grasshopper},
+  year      = {[Jahr]},
+  url       = {https://github.com/[username]/[repo]},
+  note      = {Developed as part of doctoral dissertation, [Universität]}
 }
+```
 
-References
+---
 
-    Schek, H.-J. (1974). The force density method for form finding and computation of general networks. Computer Methods in Applied Mechanics and Engineering, 3(1), 115–134.
+## References
 
-Author
+- Schek, H.-J. (1974). *The force density method for form finding and computation of general networks.* Computer Methods in Applied Mechanics and Engineering, 3(1), 115–134.
 
-[Baris Wenzel]
-[Universitaet Stuttgart]
+---
+
+## Author
+
+**[Baris Wenzel]**  
+[Universitaet Stuttgart]  
