@@ -163,11 +163,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
 
 ```bibtex
 @software{[yourname]_nephila_[year],
-  author    = {[Baris, Wenzel]},
+  author    = {Baris, Wenzel},
   title     = {Nephila — Force Density Equilibrium Plugin for Grasshopper},
-  year      = {[Jahr]},
+  year      = {2026},
   url       = {https://github.com/[username]/[repo]},
-  note      = {Developed as part of doctoral dissertation, [Universität]}
+  note      = {Developed as part of doctoral dissertation, [Universitaet]}
 }
 ```
 
