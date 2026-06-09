@@ -166,7 +166,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
   author    = {Baris, Wenzel},
   title     = {Nephila — Force Density Equilibrium Plugin for Grasshopper},
   year      = {2026},
-  url       = {https://github.com/[username]/[repo]},
+  url       = {https://github.com/barisWenzel/Nephila},
   note      = {Developed as part of doctoral dissertation, [Universitaet]}
 }
 ```
