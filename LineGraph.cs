@@ -16,15 +16,10 @@ namespace Nephila
                 "Line Graph",
                 "LGraph",
                 "Builds a graph topology from lines:\ndeduplicated vertices, edges, adjacency trees.",
-                "Nephilia",
+                "Nephila",
                 "Graph")
         {
         }
-
-        protected override Bitmap Icon => null;
-
-        public override Guid ComponentGuid =>
-            new Guid("A1B2C3D4-E5F6-7890-ABCD-EF1234567890");
 
         // ─────────────────────────────────────────────
         //  Inputs
@@ -53,7 +48,7 @@ namespace Nephila
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddPointParameter(
-                "Points", "P",
+                "Vertices", "V",
                 "Deduplicated vertex positions.",
                 GH_ParamAccess.list);
 
@@ -78,8 +73,8 @@ namespace Nephila
                 GH_ParamAccess.tree);
 
             pManager.AddGenericParameter(
-                "Labels", "Labels",
-                "TextDot labels for vertices and/or edges.",
+                "Dots", "D",
+                "Text dots for visualisation.",
                 GH_ParamAccess.list);
         }
 
@@ -88,87 +83,90 @@ namespace Nephila
         // ─────────────────────────────────────────────
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            // ── Input ─────────────────────────────────
             var lines = new List<Line>();
+            if (!DA.GetDataList(0, lines)) return;
+
             bool showEdgeNums = false;
             bool showVertexNums = false;
-
-            if (!DA.GetDataList(0, lines)) return;
             DA.GetData(1, ref showEdgeNums);
             DA.GetData(2, ref showVertexNums);
 
+            // ── Setup ─────────────────────────────────
             double tol = Rhino.RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
-
-            // ── Datenstrukturen ────────────────────────
             var pointIndex = new Dictionary<Point3d, int>(new Point3dComparer(tol));
-            var points = new List<Point3d>();
+            var vertices = new List<Point3d>();
             var edges = new List<Line>();
-            var edgeIndexSet = new HashSet<(int, int)>();
 
-            var lpTree = new DataTree<int>();
             var ppDict = new Dictionary<int, HashSet<int>>();
             var plDict = new Dictionary<int, HashSet<int>>();
+            var lpDict = new Dictionary<int, int[]>();
 
             int currentIndex = 0;
 
-            // ── Linien verarbeiten ─────────────────────
-            foreach (var line in lines)
+            // ── Build topology ────────────────────────
+            for (int e = 0; e < lines.Count; e++)
             {
-                int a = RegisterPoint(line.From, pointIndex, points, ppDict, plDict, ref currentIndex);
-                int b = RegisterPoint(line.To, pointIndex, points, ppDict, plDict, ref currentIndex);
+                Line line = lines[e];
 
-                if (a == b) continue;
+                int a = GraphHelpers.RegisterPoint(line.From, pointIndex, vertices, ppDict, plDict, ref currentIndex);
+                int b = GraphHelpers.RegisterPoint(line.To, pointIndex, vertices, ppDict, plDict, ref currentIndex);
 
-                var key = a < b ? (a, b) : (b, a);
-                if (!edgeIndexSet.Add(key)) continue;
+                if (a == b) continue; // degenerate line
 
-                int edgeIdx = edges.Count;
+                int edgeIndex = edges.Count;
                 edges.Add(line);
 
-                // LP
-                var lpPath = new GH_Path(edgeIdx);
-                lpTree.Add(a, lpPath);
-                lpTree.Add(b, lpPath);
-
-                // PP
+                // PP adjacency
                 ppDict[a].Add(b);
                 ppDict[b].Add(a);
 
-                // PL
-                plDict[a].Add(edgeIdx);
-                plDict[b].Add(edgeIdx);
+                // PL adjacency
+                plDict[a].Add(edgeIndex);
+                plDict[b].Add(edgeIndex);
+
+                // LP adjacency
+                lpDict[edgeIndex] = new[] { a, b };
             }
 
-            // ── PP Tree ────────────────────────────────
-            var ppTree = new DataTree<int>();
-            foreach (var kvp in ppDict)
+            // ── Build trees ───────────────────────────
+            var ppTree = new GH_Structure<GH_Integer>();
+            var plTree = new GH_Structure<GH_Integer>();
+            var lpTree = new GH_Structure<GH_Integer>();
+
+            for (int i = 0; i < vertices.Count; i++)
             {
-                var path = new GH_Path(kvp.Key);
-                foreach (int n in kvp.Value)
-                    ppTree.Add(n, path);
+                var ppPath = new GH_Path(i);
+                foreach (int n in ppDict[i])
+                    ppTree.Append(new GH_Integer(n), ppPath);
+
+                var plPath = new GH_Path(i);
+                foreach (int n in plDict[i])
+                    plTree.Append(new GH_Integer(n), plPath);
             }
 
-            // ── PL Tree ────────────────────────────────
-            var plTree = new DataTree<int>();
-            foreach (var kvp in plDict)
+            for (int i = 0; i < edges.Count; i++)
             {
-                var path = new GH_Path(kvp.Key);
-                foreach (int n in kvp.Value)
-                    plTree.Add(n, path);
+                var lpPath = new GH_Path(i);
+                lpTree.Append(new GH_Integer(lpDict[i][0]), lpPath);
+                lpTree.Append(new GH_Integer(lpDict[i][1]), lpPath);
             }
 
-            // ── Labels ────────────────────────────────
+            // ── Text dots ─────────────────────────────
             var dots = new List<TextDot>();
 
             if (showVertexNums)
-                for (int i = 0; i < points.Count; i++)
-                    dots.Add(new TextDot(i.ToString(), points[i]));
+                for (int i = 0; i < vertices.Count; i++)
+                    dots.Add(new TextDot($"v{i}", vertices[i]));
 
             if (showEdgeNums)
                 for (int i = 0; i < edges.Count; i++)
                     dots.Add(new TextDot($"e{i}", edges[i].PointAt(0.5)));
 
             // ── Output ────────────────────────────────
-            DA.SetDataList(0, points);
+            Message = $"{edges.Count} Edges \n {vertices.Count} Vertices";
+
+            DA.SetDataList(0, vertices);
             DA.SetDataList(1, edges);
             DA.SetDataTree(2, ppTree);
             DA.SetDataTree(3, plTree);
@@ -177,42 +175,14 @@ namespace Nephila
         }
 
         // ─────────────────────────────────────────────
-        //  Hilfsmethoden
+        //  Icon & Guid
         // ─────────────────────────────────────────────
-        private static int RegisterPoint(
-            Point3d pt,
-            Dictionary<Point3d, int> pointIndex,
-            List<Point3d> points,
-            Dictionary<int, HashSet<int>> ppDict,
-            Dictionary<int, HashSet<int>> plDict,
-            ref int currentIndex)
+        protected override System.Drawing.Bitmap Icon
         {
-            if (!pointIndex.TryGetValue(pt, out int idx))
-            {
-                idx = currentIndex++;
-                pointIndex[pt] = idx;
-                points.Add(pt);
-                ppDict[idx] = new HashSet<int>();
-                plDict[idx] = new HashSet<int>();
-            }
-            return idx;
+            get { return Nephila.Properties.Resources.NephilaIconTopo; }
         }
-    }
-
-    // ─────────────────────────────────────────────────
-    //  Point3d Comparer
-    // ─────────────────────────────────────────────────
-    internal class Point3dComparer : IEqualityComparer<Point3d>
-    {
-        private readonly double _tol;
-        public Point3dComparer(double tol) { _tol = tol; }
-
-        public bool Equals(Point3d a, Point3d b)
-            => a.DistanceToSquared(b) < _tol * _tol;
-
-        public int GetHashCode(Point3d p)
-            => ((int)(p.X / _tol))
-             ^ ((int)(p.Y / _tol))
-             ^ ((int)(p.Z / _tol));
+        
+        public override Guid ComponentGuid =>
+            new Guid("A1B2C3D4-E5F6-7890-ABCD-EF1234567890");
     }
 }

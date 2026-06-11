@@ -6,13 +6,9 @@
     <OutputType>Library</OutputType>
     <LangVersion>7.3</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AssemblyTitle>Nephila</AssemblyTitle>
-    <Company>Your Company</Company>
-    <Product>Nephila</Product>
-    <Copyright>Copyright © 2024</Copyright>
+    <Description>Structural form-finding tools for Grasshopper</Description>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <Description>Structural form-finding tools for Grasshopper</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,15 +26,23 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Copy
-      SourceFiles="$(OutputPath)$(AssemblyName).dll"
-      DestinationFolder="C:\Users\ac145501\AppData\Roaming\Grasshopper\Libraries"
-      OverwriteReadOnlyFiles="true" />
-    <Copy
-      SourceFiles="$(OutputPath)$(AssemblyName).dll"
-      DestinationFiles="C:\Users\ac145501\AppData\Roaming\Grasshopper\Libraries\$(AssemblyName).gha"
-      OverwriteReadOnlyFiles="true" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFiles="C:\Users\ac145501\AppData\Roaming\Grasshopper\Libraries\$(AssemblyName).gha" OverwriteReadOnlyFiles="true" />
   </Target>
 
 </Project>
