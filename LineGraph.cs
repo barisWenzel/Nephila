@@ -40,6 +40,11 @@ namespace Nephila
                 "Show Vertex Numbers", "SV",
                 "Show vertex index labels at points.",
                 GH_ParamAccess.item, false);
+
+            pManager.AddNumberParameter(
+                "Tolerance", "Tol",
+                "Maximum number of iterations.",
+                GH_ParamAccess.item, Rhino.RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
         }
 
         // ─────────────────────────────────────────────
@@ -88,13 +93,16 @@ namespace Nephila
             if (!DA.GetDataList(0, lines)) return;
 
             bool showEdgeNums = false;
-            bool showVertexNums = false;
             DA.GetData(1, ref showEdgeNums);
+
+            bool showVertexNums = false;
             DA.GetData(2, ref showVertexNums);
 
+            double tolerance = 0;
+            DA.GetData(3, ref tolerance);
+
             // ── Setup ─────────────────────────────────
-            double tol = Rhino.RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
-            var pointIndex = new Dictionary<Point3d, int>(new Point3dComparer(tol));
+            var pointIndex = new Dictionary<Point3d, int>(new Point3dComparer(tolerance));
             var vertices = new List<Point3d>();
             var edges = new List<Line>();
 

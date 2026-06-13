@@ -75,6 +75,12 @@ namespace Nephila
                 "Maximum number of iterations.",
                 GH_ParamAccess.item, 1000);
 
+            pManager.AddNumberParameter(
+                "Tolerance", "Tol",
+                 "Maximum number of iterations.",
+                GH_ParamAccess.item, Rhino.RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+
+
             // Optional
             pManager[3].Optional = true;
             pManager[4].Optional = true;
@@ -119,6 +125,9 @@ namespace Nephila
             var fixedEdges = new List<int>();
             var targetLengths = new List<double>();
             int maxIterations = 1000;
+            double tol = 0;
+            //maybe change to GH<point>
+            //https://discourse.mcneel.com/t/avoiding-null-point-conversion-to-0-0-0-in-gh-components/208434/2
 
             if (!DA.GetDataList(0, anchorIndices)) return;
             if (!DA.GetDataList(1, points)) return;
@@ -130,10 +139,10 @@ namespace Nephila
             if (!DA.GetDataList(7, fixedEdges)) fixedEdges = new List<int>();
             if (!DA.GetDataList(8, targetLengths)) targetLengths = new List<double>();
             DA.GetData(9, ref maxIterations);
+            DA.GetData(10, ref tol);
 
             // ── Setup ─────────────────────────────────
             int vCount = points.Count;
-            double tol = RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
 
             if (maxIterations > 10000)
             {
